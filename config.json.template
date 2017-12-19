@@ -1,0 +1,4 @@
+{
+  "github_token": "github personal access token, does not need any scopes",
+  "github_organization": "github organization name to pull repositories/PRs from"
+}
