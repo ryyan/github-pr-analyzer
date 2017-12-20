@@ -166,15 +166,18 @@ class Github {
 
 async function main() {
   try {
+    // Get command line args
+    const githubAccount = process.argv[2];
+
     // Initialize github client
-    let github = new Github(config.githubToken);
+    const github = new Github(config.githubToken);
 
     // Get repositories
-    let repositories = await github.getRepositories(config.githubAccount);
+    let repositories = await github.getRepositories(githubAccount);
 
     // Populate repositories with their PRs
     for (let i = 0; i < repositories.length; i++) {
-      repositories[i].pullRequests = await github.getPullRequests(config.githubAccount, repositories[i].name);
+      repositories[i].pullRequests = await github.getPullRequests(githubAccount, repositories[i].name);
       console.log(repositories[i]);
     }
   } catch (e) {

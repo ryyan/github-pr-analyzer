@@ -1,4 +1,3 @@
 {
-  "githubToken": "github personal access token, does not need any scopes",
-  "githubAccount": "github account/organization name to pull repositories/PRs from"
+  "githubToken": "github personal access token, does not need any scopes"
 }
