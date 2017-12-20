@@ -1,5 +1,4 @@
 'use strict';
-
 const https = require('https');
 const config = require('./config.json');
 
@@ -21,10 +20,16 @@ class PullRequest {
   }
 }
 
+/**
+ * Handles Github Graphql API calls
+ *
+ * @class Github
+ * @constructor
+ */
 class Github {
 
   constructor(githubToken) {
-    // HTTP request options
+    // HTTPS request options
     this.options = {
       hostname: 'api.github.com',
       path: '/graphql',
@@ -37,6 +42,13 @@ class Github {
     };
   }
 
+  /**
+   * Makes a Graphql API call
+   *
+   * @method request
+   * @param {String} query Graphql query
+   * @return {Object} Returns parsed JSON data
+   */
   request(query) {
     return new Promise((resolve, reject) => {
       const req = https.request(this.options, (res) => {
@@ -67,6 +79,14 @@ class Github {
     });
   };
 
+  /**
+   * Get all repositories for an account
+   *
+   * @method getRepositories
+   * @param {String} githubAccount Github account/organization name
+   * @param {String} endCursor Github graphql endCursor for pagination
+   * @return {Array} Returns array of Repository objects
+   */
   async getRepositories(githubAccount, endCursor) {
     try {
       let paginationArg = `first: 100`;
@@ -106,6 +126,15 @@ class Github {
     }
   }
 
+  /**
+   * Get all pull requests for a repository
+   *
+   * @method getPullRequests
+   * @param {String} githubAccount Github account/organization name that owns the repo
+   * @param {String} repositoryName Repository name
+   * @param {String} endCursor Github graphql endCursor for pagination
+   * @return {Array} Returns array of PullRequest objects
+   */
   async getPullRequests(githubAccount, repositoryName, endCursor) {
     try {
       let paginationArg = `first: 100`;
