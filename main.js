@@ -1,15 +1,19 @@
+'use strict';
+
 const https = require('https');
 const config = require('./config.json');
 
 class Repository {
+
   constructor(id, name) {
     this.id = id;
     this.name = name;
-    this.PullRequests = [];
+    this.pullRequests = [];
   }
 }
 
 class PullRequest {
+
   constructor(id, title, body) {
     this.id = id;
     this.title = title;
@@ -18,86 +22,115 @@ class PullRequest {
 }
 
 class Github {
-  constructor(github_token) {
-    const options = {
+
+  constructor(githubToken) {
+    // HTTP request options
+    this.options = {
       hostname: 'api.github.com',
       path: '/graphql',
       method: 'POST',
       headers: {
-        'Authorization': `token ${github_token}`,
+        'Authorization': `token ${githubToken}`,
         'User-Agent': 'github-pr-analyzer',
         'Content-Type': 'application/json'
       }
     };
-
-    this.request = (query) => {
-      return new Promise((resolve, reject) => {
-        const req = https.request(options, (res) => {
-          let result = ''
-
-          res.setEncoding('utf8');
-
-          res.on('data', (chunk) => {
-            result += chunk
-          });
-
-          res.on('error', (err) => {
-            reject(e.message);
-          });
-
-          res.on('end', () => {
-            resolve(JSON.parse(result));
-          });
-        });
-
-        req.write(JSON.stringify({query}));
-        req.end();
-      });
-    };
   }
 
-  async getRepositories(owner) {
+  request(query) {
+    return new Promise((resolve, reject) => {
+      const req = https.request(this.options, (res) => {
+        let result = ''
+
+        res.setEncoding('utf8');
+
+        res.on('data', (chunk) => {
+          result += chunk
+        });
+
+        res.on('error', (err) => {
+          return reject(e.message);
+        });
+
+        res.on('end', () => {
+          result = JSON.parse(result);
+          if(result.errors) {
+            return reject(result.errors);
+          } else {
+            return resolve(result.data);
+          }
+        });
+      });
+
+      req.write(JSON.stringify({query}));
+      req.end();
+    });
+  };
+
+  async getRepositories(githubAccount, endCursor) {
     try {
+      let paginationArg = `first: 100`;
+      if (endCursor) {
+        paginationArg += `, after: "${endCursor}"`;
+      }
+
       const query = `query {
-        organization(login: "${owner}") {
-          repositories(first:100) {
+        organization(login: "${githubAccount}") {
+          repositories(${paginationArg}) {
             edges {
               node {
                 id
                 name
-                nameWithOwner
               }
+            }
+
+            pageInfo {
+              endCursor
+              hasNextPage
             }
           }
         }
       }`;
 
-      let result = await this.request(query);
-      return result['data']['organization']['repositories']['edges']
-        .map(repository => Object.assign(new Repository, repository['node']));
+      const response = await this.request(query);
+      const pageInfo = response.organization.repositories.pageInfo;
+      const edges = response.organization.repositories.edges;
+      const result = edges.map(edge => Object.assign(new Repository, edge.node));
+
+      if (pageInfo.hasNextPage) {
+        return result.concat(await this.getRepositories(githubAccount, pageInfo.endCursor));
+      }
+      return result;
     } catch (e) {
       throw e;
     }
   }
 
-  async getPRs(repository_owner, repository_name) {
+  async getPullRequests(githubAccount, repositoryName, endCursor) {
     try {
+      let paginationArg = `first: 100`;
+      if (endCursor) {
+        paginationArg += `, after: "${endCursor}"`;
+      }
+
       const query = `query {
-        repository(owner: "${repository_owner}", name: "${repository_name}") {
-          pullRequests(first:100) {
+        repository(owner: "${githubAccount}", name: "${repositoryName}") {
+          pullRequests(${paginationArg}) {
             edges {
               node {
                 id
                 number
                 title
                 body
+                baseRefName
                 author {
                   login
                 }
-                baseRefName
+
                 additions
                 deletions
                 changedFiles
+
                 state
                 createdAt
                 closed
@@ -107,14 +140,24 @@ class Github {
                 mergeable
               }
             }
+
+            pageInfo {
+              endCursor
+              hasNextPage
+            }
           }
         }
       }`;
 
-      let result = await this.request(query);
-      console.log(JSON.stringify(result, null, 4));
-      return result['data']['repository']['pullRequests']['edges']
-        .map(pr => Object.assign(new PullRequest, pr['node']));
+      const response = await this.request(query);
+      const pageInfo = response.repository.pullRequests.pageInfo;
+      const edges = response.repository.pullRequests.edges;
+      const result = edges.map(edge => Object.assign(new PullRequest, edge.node));
+
+      if (pageInfo.hasNextPage) {
+        return result.concat(await this.getPullRequests(githubAccount, repositoryName, pageInfo.endCursor));
+      }
+      return result;
     } catch (e) {
       throw e;
     }
@@ -123,12 +166,17 @@ class Github {
 
 async function main() {
   try {
-    let github = new Github(config.github_token);
-    let repositories = await github.getRepositories(config.github_organization);
-    console.log(repositories);
+    // Initialize github client
+    let github = new Github(config.githubToken);
 
-    let prs = await github.getPRs(config.github_organization, repositories[0].name);
-    console.log(prs);
+    // Get repositories
+    let repositories = await github.getRepositories(config.githubAccount);
+
+    // Populate repositories with their PRs
+    for (let i = 0; i < repositories.length; i++) {
+      repositories[i].pullRequests = await github.getPullRequests(config.githubAccount, repositories[i].name);
+      console.log(repositories[i]);
+    }
   } catch (e) {
     console.error(e);
   }
