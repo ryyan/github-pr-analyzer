@@ -89,11 +89,13 @@ class Github {
    */
   async getRepositories(githubAccount, endCursor) {
     try {
+      // Set pagination argument
       let paginationArg = `first: 100`;
       if (endCursor) {
         paginationArg += `, after: "${endCursor}"`;
       }
 
+      // Create query
       const query = `query {
         organization(login: "${githubAccount}") {
           repositories(${paginationArg}) {
@@ -112,17 +114,29 @@ class Github {
         }
       }`;
 
+      // Execute query
       const response = await this.request(query);
+
+      // Extract pageInfo and edges from response
       const pageInfo = response.organization.repositories.pageInfo;
       const edges = response.organization.repositories.edges;
-      const result = edges.map(edge => Object.assign(new Repository, edge.node));
 
+      // Convert edges to result objects
+      const results = await Promise.all(edges.map(async edge => {
+        let result = Object.assign(new Repository, edge.node);
+        result.pullRequests = await this.getPullRequests(githubAccount, result.name);
+        return result;
+      }));
+
+      // Recursively get next page of results if available
       if (pageInfo.hasNextPage) {
-        return result.concat(await this.getRepositories(githubAccount, pageInfo.endCursor));
+        return results.concat(await this.getRepositories(githubAccount, pageInfo.endCursor));
       }
-      return result;
-    } catch (e) {
-      throw e;
+
+      // Return final results
+      return results;
+    } catch (err) {
+      throw err;
     }
   }
 
@@ -137,11 +151,13 @@ class Github {
    */
   async getPullRequests(githubAccount, repositoryName, endCursor) {
     try {
+      // Set pagination argument
       let paginationArg = `first: 100`;
       if (endCursor) {
         paginationArg += `, after: "${endCursor}"`;
       }
 
+      // Create query
       const query = `query {
         repository(owner: "${githubAccount}", name: "${repositoryName}") {
           pullRequests(${paginationArg}) {
@@ -178,17 +194,27 @@ class Github {
         }
       }`;
 
+      // Execute query
       const response = await this.request(query);
+
+      // Extract pageInfo and edges from response
       const pageInfo = response.repository.pullRequests.pageInfo;
       const edges = response.repository.pullRequests.edges;
-      const result = edges.map(edge => Object.assign(new PullRequest, edge.node));
 
+      // Convert edges to result objects
+      const results = await Promise.all(edges.map(async edge => {
+        return Object.assign(new PullRequest, edge.node);
+      }));
+
+      // Recursively get next page of results if available
       if (pageInfo.hasNextPage) {
-        return result.concat(await this.getPullRequests(githubAccount, repositoryName, pageInfo.endCursor));
+        return results.concat(await this.getPullRequests(githubAccount, repositoryName, pageInfo.endCursor));
       }
-      return result;
-    } catch (e) {
-      throw e;
+
+      // Return final results
+      return results;
+    } catch (err) {
+      throw err;
     }
   }
 }
@@ -204,13 +230,11 @@ async function main() {
     // Get repositories
     let repositories = await github.getRepositories(githubAccount);
 
-    // Populate repositories with their PRs
     for (let i = 0; i < repositories.length; i++) {
-      repositories[i].pullRequests = await github.getPullRequests(githubAccount, repositories[i].name);
       console.log(repositories[i]);
     }
-  } catch (e) {
-    console.error(e);
+  } catch (err) {
+    console.error(err);
   }
 }
 
