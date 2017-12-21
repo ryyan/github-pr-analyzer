@@ -221,14 +221,15 @@ class Github {
 
 async function main() {
   try {
-    // Get command line args
+    // Get config values and command line args
+    const githubToken = config.githubToken;
     const githubAccount = process.argv[2];
 
     // Initialize github client
-    const github = new Github(config.githubToken);
+    const github = new Github(githubToken);
 
     // Get repositories
-    let repositories = await github.getRepositories(githubAccount);
+    const repositories = await github.getRepositories(githubAccount);
 
     for (let i = 0; i < repositories.length; i++) {
       console.log(repositories[i]);
