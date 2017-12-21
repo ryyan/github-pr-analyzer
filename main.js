@@ -99,7 +99,7 @@ class Github {
    * @param {String} endCursor Github graphql endCursor for pagination
    * @return {Array} Returns array of Repository objects
    */
-  async getRepositories(githubAccount, endCursor) {
+  async getRepositories(githubAccountType, githubAccount, endCursor) {
 
     try {
       // Set pagination argument
@@ -110,7 +110,7 @@ class Github {
 
       // Create query
       const query = `query {
-        organization(login: "${githubAccount}") {
+        ${githubAccountType}(login: "${githubAccount}") {
           repositories(${paginationArg}) {
             edges {
               node {
@@ -131,8 +131,8 @@ class Github {
       const response = await this.request(query);
 
       // Extract pageInfo and edges from response
-      const pageInfo = response.organization.repositories.pageInfo;
-      const edges = response.organization.repositories.edges;
+      const pageInfo = response[githubAccountType].repositories.pageInfo;
+      const edges = response[githubAccountType].repositories.edges;
 
       // Convert edges to result objects
       let results = []
@@ -269,13 +269,14 @@ async function main() {
   try {
     console.log('Load config.json values and command line args');
     const githubToken = config.githubToken;
-    const githubAccount = process.argv[2];
+    const githubAccountType = process.argv[2];
+    const githubAccount = process.argv[3];
 
     console.log('Initialize github client');
     const github = new Github(githubToken);
 
     console.log('Fetch repositories');
-    const repositories = await github.getRepositories(githubAccount);
+    const repositories = await github.getRepositories(githubAccountType, githubAccount);
 
     /* Debug block
     for (let i = 0; i < repositories.length; i++) {

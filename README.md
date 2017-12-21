@@ -13,5 +13,12 @@ cp config.json.template config.json
 ## Run
 
 ```
-node main.js <Github account name to analyze>
+node main.js <user|organization> <Github account name to analyze>
+```
+
+Examples:
+
+```
+node main.js user ryyan
+node main.js organization github
 ```
