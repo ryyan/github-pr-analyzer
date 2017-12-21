@@ -4,12 +4,6 @@ const config = require('./config.json');
 
 class Repository {
 
-  constructor(id, name) {
-    this.id = id;
-    this.name = name;
-    this.pullRequests = [];
-  }
-
   get prOpenCount() {
     return this.pullRequests.filter(pr => pr.closed === false).length;
   }
@@ -25,10 +19,12 @@ class Repository {
 
 class PullRequest {
 
-  constructor(id, title, body) {
-    this.id = id;
-    this.title = title;
-    this.body = body;
+  set author(author) {
+    if(author && author.login) {
+      this.authorLogin = author.login;
+    } else {
+      this.authorLogin = '';
+    }
   }
 }
 
@@ -242,6 +238,7 @@ class Github {
  */
 function countState(repositories) {
   // Print header
+  console.log();
   console.log('Count State');
   console.log('-----------');
   console.log('Repository\tOpen\tClosed\tMerged\tTotal');
@@ -263,6 +260,36 @@ function countState(repositories) {
 }
 
 /**
+ * Counts and displays the total number of PRs opened by all authors
+ *
+ * @method countAuthor
+ * @param {Array} repositories Array of repositories with fully populated nested elements
+ */
+function countAuthor(repositories) {
+  // Print header
+  console.log();
+  console.log('Count Author');
+  console.log('------------');
+  console.log('Author\tPull Requests');
+
+  let counts = new Object();
+  repositories.forEach(repo => {
+    repo.pullRequests.forEach(pr => {
+      if (counts[pr.authorLogin]) {
+        counts[pr.authorLogin] += 1;
+      } else {
+        counts[pr.authorLogin] = 1;
+      }
+    });
+  });
+
+  // Print data rows
+  for(let key in counts) {
+    console.log(`${key}\t${counts[key]}`);
+  }
+}
+
+/**
  * @method main
  */
 async function main() {
@@ -278,15 +305,15 @@ async function main() {
     console.log('Fetch repositories');
     const repositories = await github.getRepositories(githubAccountType, githubAccount);
 
-    /* Debug block
+    ///* Debug block
     for (let i = 0; i < repositories.length; i++) {
       console.log(repositories[i]);
     }
-    */
+    // */
 
     // Analysis functions
-    console.log();
     countState(repositories);
+    countAuthor(repositories);
   } catch (err) {
     console.error(err);
   }
