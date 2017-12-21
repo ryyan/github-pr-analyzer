@@ -9,6 +9,18 @@ class Repository {
     this.name = name;
     this.pullRequests = [];
   }
+
+  get prOpenCount() {
+    return this.pullRequests.filter(pr => pr.closed === false).length;
+  }
+
+  get prClosedCount() {
+    return this.pullRequests.filter(pr => pr.closed === true).length;
+  }
+
+  get prMergedCount() {
+    return this.pullRequests.filter(pr => pr.merged === true).length;
+  }
 }
 
 class PullRequest {
@@ -88,6 +100,7 @@ class Github {
    * @return {Array} Returns array of Repository objects
    */
   async getRepositories(githubAccount, endCursor) {
+
     try {
       // Set pagination argument
       let paginationArg = `first: 100`;
@@ -122,11 +135,13 @@ class Github {
       const edges = response.organization.repositories.edges;
 
       // Convert edges to result objects
-      const results = await Promise.all(edges.map(async edge => {
-        let result = Object.assign(new Repository, edge.node);
+      let results = []
+      for(let edge in edges) {
+        let result = Object.assign(new Repository, edges[edge].node);
+        process.stdout.write(`Fetch pull requests for ${result.name}`);
         result.pullRequests = await this.getPullRequests(githubAccount, result.name);
-        return result;
-      }));
+        results.push(result);
+      }
 
       // Recursively get next page of results if available
       if (pageInfo.hasNextPage) {
@@ -202,16 +217,16 @@ class Github {
       const edges = response.repository.pullRequests.edges;
 
       // Convert edges to result objects
-      const results = await Promise.all(edges.map(async edge => {
-        return Object.assign(new PullRequest, edge.node);
-      }));
+      const results = edges.map(edge => Object.assign(new PullRequest, edge.node));
 
       // Recursively get next page of results if available
       if (pageInfo.hasNextPage) {
+        process.stdout.write('.');
         return results.concat(await this.getPullRequests(githubAccount, repositoryName, pageInfo.endCursor));
       }
 
       // Return final results
+      console.log();
       return results;
     } catch (err) {
       throw err;
@@ -219,24 +234,62 @@ class Github {
   }
 }
 
+/**
+ * Counts and displays the states (open/closed/merged/total) for all repositories and combined totals
+ *
+ * @method countState
+ * @param {Array} repositories Array of repositories with fully populated nested elements
+ */
+function countState(repositories) {
+  // Print header
+  console.log('Count State');
+  console.log('-----------');
+  console.log('Repository\tOpen\tClosed\tMerged\tTotal');
+
+  let totalOpen = 0, totalClosed = 0, totalMerged = 0, totalCount = 0;
+  repositories.forEach(repo => {
+    // Print repository row
+    console.log(`${repo.name.substring(0,10)}\t${repo.prOpenCount}\t${repo.prClosedCount}\t${repo.prMergedCount}\t${repo.pullRequests.length}`);
+
+    // Increment totals
+    totalOpen += repo.prOpenCount;
+    totalClosed += repo.prClosedCount;
+    totalMerged += repo.prMergedCount;
+    totalCount += repo.pullRequests.length;
+  });
+
+  // Print total row
+  console.log(`Total\t\t${totalOpen}\t${totalClosed}\t${totalMerged}\t${totalCount}`);
+}
+
+/**
+ * @method main
+ */
 async function main() {
   try {
-    // Get config values and command line args
+    console.log('Load config.json values and command line args');
     const githubToken = config.githubToken;
     const githubAccount = process.argv[2];
 
-    // Initialize github client
+    console.log('Initialize github client');
     const github = new Github(githubToken);
 
-    // Get repositories
+    console.log('Fetch repositories');
     const repositories = await github.getRepositories(githubAccount);
 
+    /* Debug block
     for (let i = 0; i < repositories.length; i++) {
       console.log(repositories[i]);
     }
+    */
+
+    // Analysis functions
+    console.log();
+    countState(repositories);
   } catch (err) {
     console.error(err);
   }
 }
 
+console.log('Start pull request analyzer');
 main();
