@@ -1,4 +1,5 @@
 'use strict';
+const fs = require('fs');
 const https = require('https');
 const config = require('./config.json');
 
@@ -137,6 +138,7 @@ class Github {
         process.stdout.write(`Fetch pull requests for ${result.name}`);
         result.pullRequests = await this.getPullRequests(githubAccount, result.name);
         results.push(result);
+        console.log();
       }
 
       // Recursively get next page of results if available
@@ -222,7 +224,6 @@ class Github {
       }
 
       // Return final results
-      console.log();
       return results;
     } catch (err) {
       throw err;
@@ -290,6 +291,43 @@ function countAuthor(repositories) {
 }
 
 /**
+ * Retrieves and caches repository data from cache or from Github
+ *
+ * @method getAndCacheRepositories
+ * @param {String} githubToken Github personal access token
+ * @param {String} githubAccountType 'user' or 'organization'
+ * @param {String} githubAccount Github account/organization name
+ */
+async function getAndCacheRepositories(githubToken, githubAccountType, githubAccount) {
+  try {
+    console.log('Check cache for this account');
+    const cacheDirectory = './cache';
+    const cacheFilePath = `${cacheDirectory}/${githubAccountType}-${githubAccount}`;
+    const cache = fs.existsSync(cacheFilePath) ? fs.readFileSync(cacheFilePath) : null;
+
+    if (cache) {
+      console.log('Use cached data');
+      return JSON.parse(cache).map(row => Object.assign(new Repository, row));
+    }
+
+    console.log('Initialize github client');
+    const github = new Github(githubToken);
+
+    console.log('Fetch repositories');
+    const repositories = await github.getRepositories(githubAccountType, githubAccount);
+
+    console.log('Cache repositories');
+    if (!fs.existsSync(cacheDirectory)) {
+      fs.mkdirSync(cacheDirectory);
+    }
+    fs.writeFileSync(cacheFilePath, JSON.stringify(repositories));
+    return repositories;
+  } catch (err) {
+    throw err;
+  }
+}
+
+/**
  * @method main
  */
 async function main() {
@@ -299,19 +337,7 @@ async function main() {
     const githubAccountType = process.argv[2];
     const githubAccount = process.argv[3];
 
-    console.log('Initialize github client');
-    const github = new Github(githubToken);
-
-    console.log('Fetch repositories');
-    const repositories = await github.getRepositories(githubAccountType, githubAccount);
-
-    ///* Debug block
-    for (let i = 0; i < repositories.length; i++) {
-      console.log(repositories[i]);
-    }
-    // */
-
-    // Analysis functions
+    const repositories = await getAndCacheRepositories(githubToken, githubAccountType, githubAccount);
     countState(repositories);
     countAuthor(repositories);
   } catch (err) {
