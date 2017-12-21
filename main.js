@@ -240,14 +240,14 @@ class Github {
 function countState(repositories) {
   // Print header
   console.log();
-  console.log('Count State');
-  console.log('-----------');
-  console.log('Repository\tOpen\tClosed\tMerged\tTotal');
+  console.log('Pull Request Counts by State');
+  console.log('----------------------------');
+  console.log('Open\tClosed\tMerged\tTotal\tRepository');
 
   let totalOpen = 0, totalClosed = 0, totalMerged = 0, totalCount = 0;
   repositories.forEach(repo => {
     // Print repository row
-    console.log(`${repo.name.substring(0,10)}\t${repo.prOpenCount}\t${repo.prClosedCount}\t${repo.prMergedCount}\t${repo.pullRequests.length}`);
+    console.log(`${repo.prOpenCount}\t${repo.prClosedCount}\t${repo.prMergedCount}\t${repo.pullRequests.length}\t${repo.name}`);
 
     // Increment totals
     totalOpen += repo.prOpenCount;
@@ -257,7 +257,7 @@ function countState(repositories) {
   });
 
   // Print total row
-  console.log(`Total\t\t${totalOpen}\t${totalClosed}\t${totalMerged}\t${totalCount}`);
+  console.log(`${totalOpen}\t${totalClosed}\t${totalMerged}\t${totalCount}\tTotal`);
 }
 
 /**
@@ -269,11 +269,11 @@ function countState(repositories) {
 function countAuthor(repositories) {
   // Print header
   console.log();
-  console.log('Count Author');
-  console.log('------------');
-  console.log('Author\tPull Requests');
+  console.log('Pull Request Counts by Author');
+  console.log('-----------------------------');
+  console.log('PRs\tAuthor');
 
-  let counts = new Object();
+  let counts = Object();
   repositories.forEach(repo => {
     repo.pullRequests.forEach(pr => {
       if (counts[pr.authorLogin]) {
@@ -286,7 +286,7 @@ function countAuthor(repositories) {
 
   // Print data rows
   for(let key in counts) {
-    console.log(`${key}\t${counts[key]}`);
+    console.log(`${counts[key]}\t${key}`);
   }
 }
 
