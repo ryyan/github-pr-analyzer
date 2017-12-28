@@ -47,7 +47,8 @@ class Github {
         'Authorization': `token ${githubToken}`,
         'User-Agent': 'github-pr-analyzer',
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 100000
     };
   }
 
@@ -76,6 +77,7 @@ class Github {
         res.on('end', () => {
           result = JSON.parse(result);
           if(result.errors) {
+            console.log(JSON.stringify(result, 2));
             return reject(result.errors);
           } else {
             return resolve(result.data);
@@ -83,8 +85,10 @@ class Github {
         });
       });
 
-      req.write(JSON.stringify({query}));
-      req.end();
+      setTimeout(() => {
+        req.write(JSON.stringify({query}));
+        req.end();
+      }, 1000);
     });
   };
 
